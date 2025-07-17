@@ -15,16 +15,77 @@ export const getUserProgress = () => {
   });
 };
 
+// Store the active lesson ID in memory
+let activeLesson = "lesson1";
+
+// Update the active lesson ID
+export const setActiveLesson = (lessonId: string | number) => {
+  activeLesson = lessonId.toString();
+  return Promise.resolve(true);
+};
+
 export const getCourseProgress = () => {
+  // Determine which lesson to show as active
+  let lessonId = activeLesson;
+  let lessonTitle, lessonOrder, unitId, unitTitle, unitOrder;
+  
+  if (lessonId.startsWith("lesson")) {
+    // Extract lesson number
+    const lessonNum = parseInt(lessonId.replace("lesson", ""), 10);
+    
+    if (lessonNum <= 6) {
+      // Unit 1 lessons
+      unitId = "unit1";
+      unitTitle = "Unit 1";
+      unitOrder = 1;
+    } else {
+      // Unit 2 lessons
+      unitId = "unit2";
+      unitTitle = "Unit 2";
+      unitOrder = 2;
+    }
+    
+    if (lessonNum <= 6) {
+      lessonOrder = lessonNum;
+    } else {
+      lessonOrder = lessonNum - 6;
+    }
+    
+    // Set lesson title based on ID
+    switch(lessonId) {
+      case "lesson1": lessonTitle = "HTML Tutorial"; break;
+      case "lesson2": lessonTitle = "Greetings"; break;
+      case "lesson3": lessonTitle = "Basic Phrases"; break;
+      case "lesson4": lessonTitle = "Conversations"; break;
+      case "lesson5": lessonTitle = "Daily Talk"; break;
+      case "lesson6": lessonTitle = "Common Phrases"; break;
+      case "lesson7": lessonTitle = "Questions"; break;
+      case "lesson8": lessonTitle = "Responses"; break;
+      case "lesson9": lessonTitle = "Directions"; break;
+      case "lesson10": lessonTitle = "Time Expressions"; break;
+      case "lesson11": lessonTitle = "Activities"; break;
+      case "lesson12": lessonTitle = "Plans"; break;
+      default: lessonTitle = "Introduction";
+    }
+  } else {
+    // Default values
+    lessonId = "lesson1";
+    lessonTitle = "HTML Tutorial";
+    lessonOrder = 1;
+    unitId = "unit1";
+    unitTitle = "Unit 1";
+    unitOrder = 1;
+  }
+  
   return Promise.resolve({
     activeLesson: {
-      id: "lesson1",
-      title: "Introduction",
-      order: 1,
+      id: lessonId,
+      title: lessonTitle,
+      order: lessonOrder,
       unit: {
-        id: "unit1",
-        title: "Unit 1",
-        order: 1
+        id: unitId,
+        title: unitTitle,
+        order: unitOrder
       }
     }
   });

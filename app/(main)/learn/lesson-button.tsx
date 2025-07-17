@@ -15,6 +15,7 @@ type Props = {
   totalCount: number;
   locked?: boolean;
   current?: boolean;
+  completed?: boolean;
   percentage: number;
 };
 
@@ -24,6 +25,7 @@ export const LessonButton = ({
   totalCount,
   locked,
   current,
+  completed,
   percentage
 }: Props) => {
   const cycleLength = 8;
@@ -45,7 +47,7 @@ export const LessonButton = ({
 
   const isFirst = index === 0;
   const isLast = index === totalCount;
-  const isCompleted = !current && !locked;
+  const isCompleted = completed ?? (!current && !locked);
 
   const Icon = isCompleted ? Check : isLast ? Crown : Star;
 

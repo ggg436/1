@@ -9,6 +9,7 @@ import { useWindowSize } from "react-use";
 import { Header } from "./header";
 import { Footer } from "./footer";
 import { ResultCard } from "./result-card";
+import { setActiveLesson } from "@/db/queries";
 
 type Props ={
   initialPercentage: number;
@@ -42,6 +43,22 @@ export const Quiz = ({
     
     // Set status to completed to show the congratulation screen
     setStatus("completed");
+  };
+  
+  // Navigate back to the lesson selection screen
+  const handleContinueClick = async () => {
+    // If current lesson is lesson1, set lesson2 as active for next time
+    if (lessonId === "lesson1" || lessonId === 1) {
+      await setActiveLesson("lesson2");
+    } 
+    // If current lesson is lesson2, set lesson3 as active
+    else if (lessonId === "lesson2" || lessonId === 2) {
+      await setActiveLesson("lesson3");
+    }
+    // Add additional lesson transitions as needed
+    
+    // Navigate back to the lesson screen
+    router.push("/learn");
   };
   
   if (status === "completed") {
@@ -86,7 +103,7 @@ export const Quiz = ({
         <Footer
           lessonId={typeof lessonId === 'string' ? parseInt(lessonId, 10) : lessonId as number}
           status="completed"
-          onCheck={() => router.push("/learn")}
+          onCheck={handleContinueClick}
         />
       </>
     );
