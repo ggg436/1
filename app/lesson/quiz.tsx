@@ -1,35 +1,21 @@
 "use client";
 
-import { toast } from "sonner";
 import Image from "next/image";
 import Confetti from "react-confetti";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
-import { useAudio, useWindowSize, useMount } from "react-use";
-
-import { reduceHearts } from "@/actions/user-progress";
-import { useHeartsModal } from "@/store/use-hearts-modal";
-import { challengeOptions, challenges, userSubscription } from "@/db/schema";
-import { usePracticeModal } from "@/store/use-practice-modal";
-import { upsertChallengeProgress } from "@/actions/challenge-progress";
+import { useState } from "react";
+import { useWindowSize } from "react-use";
 
 import { Header } from "./header";
 import { Footer } from "./footer";
-import { Challenge } from "./challenge";
 import { ResultCard } from "./result-card";
-import { QuestionBubble } from "./question-bubble";
 
 type Props ={
   initialPercentage: number;
   initialHearts: number;
-  initialLessonId: number;
-  initialLessonChallenges: (typeof challenges.$inferSelect & {
-    completed: boolean;
-    challengeOptions: typeof challengeOptions.$inferSelect[];
-  })[];
-  userSubscription: typeof userSubscription.$inferSelect & {
-    isActive: boolean;
-  } | null;
+  initialLessonId: string | number;
+  initialLessonChallenges: any[];
+  userSubscription: any;
 };
 
 export const Quiz = ({
@@ -39,126 +25,28 @@ export const Quiz = ({
   initialLessonChallenges,
   userSubscription,
 }: Props) => {
-  const { open: openHeartsModal } = useHeartsModal();
-  const { open: openPracticeModal } = usePracticeModal();
-
-  useMount(() => {
-    if (initialPercentage === 100) {
-      openPracticeModal();
-    }
-  });
-
   const { width, height } = useWindowSize();
-
   const router = useRouter();
 
-  const [finishAudio] = useAudio({ src: "/finish.mp3", autoPlay: true });
-  const [
-    correctAudio,
-    _c,
-    correctControls,
-  ] = useAudio({ src: "/correct.wav" });
-  const [
-    incorrectAudio,
-    _i,
-    incorrectControls,
-  ] = useAudio({ src: "/incorrect.wav" });
-  const [pending, startTransition] = useTransition();
-
   const [lessonId] = useState(initialLessonId);
-  const [hearts, setHearts] = useState(initialHearts);
-  const [percentage, setPercentage] = useState(() => {
-    return initialPercentage === 100 ? 0 : initialPercentage;
-  });
-  const [challenges] = useState(initialLessonChallenges);
-  const [activeIndex, setActiveIndex] = useState(() => {
-    const uncompletedIndex = challenges.findIndex((challenge) => !challenge.completed);
-    return uncompletedIndex === -1 ? 0 : uncompletedIndex;
-  });
+  const [hearts] = useState(initialHearts);
+  const [status, setStatus] = useState<"none" | "completed">("none");
 
-  const [selectedOption, setSelectedOption] = useState<number>();
-  const [status, setStatus] = useState<"correct" | "wrong" | "none">("none");
-
-  const challenge = challenges[activeIndex];
-  const options = challenge?.challengeOptions ?? [];
-
-  const onNext = () => {
-    setActiveIndex((current) => current + 1);
+  // Get the first challenge question
+  const questionText = initialLessonChallenges[0]?.question || "How are you";
+  
+  const handleFinish = () => {
+    // Play finish sound
+    const audio = new Audio("/finish.mp3");
+    audio.play().catch(e => console.error("Error playing audio:", e));
+    
+    // Set status to completed to show the congratulation screen
+    setStatus("completed");
   };
-
-  const onSelect = (id: number) => {
-    if (status !== "none") return;
-
-    setSelectedOption(id);
-  };
-
-  const onContinue = () => {
-    if (!selectedOption) return;
-
-    if (status === "wrong") {
-      setStatus("none");
-      setSelectedOption(undefined);
-      return;
-    }
-
-    if (status === "correct") {
-      onNext();
-      setStatus("none");
-      setSelectedOption(undefined);
-      return;
-    }
-
-    const correctOption = options.find((option) => option.correct);
-
-    if (!correctOption) {
-      return;
-    }
-
-    if (correctOption.id === selectedOption) {
-      startTransition(() => {
-        upsertChallengeProgress(challenge.id)
-          .then((response) => {
-            if (response?.error === "hearts") {
-              openHeartsModal();
-              return;
-            }
-
-            correctControls.play();
-            setStatus("correct");
-            setPercentage((prev) => prev + 100 / challenges.length);
-
-            // This is a practice
-            if (initialPercentage === 100) {
-              setHearts((prev) => Math.min(prev + 1, 5));
-            }
-          })
-          .catch(() => toast.error("Something went wrong. Please try again."))
-      });
-    } else {
-      startTransition(() => {
-        reduceHearts(challenge.id)
-          .then((response) => {
-            if (response?.error === "hearts") {
-              openHeartsModal();
-              return;
-            }
-
-            incorrectControls.play();
-            setStatus("wrong");
-
-            if (!response?.error) {
-              setHearts((prev) => Math.max(prev - 1, 0));
-            }
-          })
-          .catch(() => toast.error("Something went wrong. Please try again."))
-      });
-    }
-  };
-
-  if (!challenge) {
+  
+  if (status === "completed") {
     return (
       <>
-        {finishAudio}
         <Confetti
           width={width}
           height={height}
@@ -187,7 +75,7 @@ export const Quiz = ({
           <div className="flex items-center gap-x-4 w-full">
             <ResultCard
               variant="points"
-              value={challenges.length * 10}
+              value={10}
             />
             <ResultCard
               variant="hearts"
@@ -196,7 +84,7 @@ export const Quiz = ({
           </div>
         </div>
         <Footer
-          lessonId={lessonId}
+          lessonId={typeof lessonId === 'string' ? parseInt(lessonId, 10) : lessonId as number}
           status="completed"
           onCheck={() => router.push("/learn")}
         />
@@ -204,46 +92,83 @@ export const Quiz = ({
     );
   }
 
-  const title = challenge.type === "ASSIST" 
-    ? "Select the correct meaning"
-    : challenge.question;
+  // Format the HTML tutorial content
+  const formatContent = (text: string) => {
+    // Split the content by newlines to create paragraphs
+    return text.split('\n').map((line, index) => {
+      if (line.startsWith('<!DOCTYPE') || line.startsWith('<html') || line.startsWith('<head') || 
+          line.startsWith('</head') || line.startsWith('<body') || line.startsWith('</body') || 
+          line.startsWith('</html') || line.startsWith('<title') || line.startsWith('</title')) {
+        return <div key={index} className="my-1"><code className="font-mono text-blue-600">{line}</code></div>;
+      } else if (line.startsWith('<h1>') || line.startsWith('</h1>')) {
+        return <div key={index} className="my-1"><code className="font-mono text-purple-600">{line}</code></div>;
+      } else if (line.startsWith('<p>') || line.startsWith('</p>')) {
+        return <div key={index} className="my-1"><code className="font-mono text-green-600">{line}</code></div>;
+      } else if (line.startsWith('Example')) {
+        return <h2 key={index} className="text-xl font-bold mt-4 mb-2">{line}</h2>;
+      } else if (line.startsWith('HTML ')) {
+        return <h2 key={index} className="text-xl font-bold mt-4 mb-2">{line}</h2>;
+      } else if (line.startsWith('Track Your')) {
+        return <h2 key={index} className="text-xl font-bold mt-4 mb-2">{line}</h2>;
+      } else if (line.startsWith('Kickstart')) {
+        return <h2 key={index} className="text-xl font-bold mt-4 mb-2">{line}</h2>;
+      } else if (line.startsWith('Checkmark')) {
+        return (
+          <div key={index} className="flex items-start my-1">
+            <span className="text-green-500 mr-2">✓</span>
+            <span>{line.replace('Checkmark', '')}</span>
+          </div>
+        );
+      } else if (line === 'Video: HTML for Beginners') {
+        return <h2 key={index} className="text-xl font-bold mt-4 mb-2">{line}</h2>;
+      } else if (line.trim() === 'Learn HTML') {
+        return <h1 key={index} className="text-2xl font-bold mt-4 mb-2">{line}</h1>;
+      } else if (line.trim() === 'HTML Tutorial') {
+        return <h1 key={index} className="text-3xl font-bold mt-4 mb-2">{line}</h1>;
+      } else if (line.trim() === 'w' || line.trim() === '3' || line.trim() === 's' || 
+                line.trim() === 'c' || line.trim() === 'h' || line.trim() === 'o' || 
+                line.trim() === 'l' || line.trim() === 'C' || line.trim() === 'E' ||
+                line.trim() === 'R' || line.trim() === 'T' || line.trim() === 'I' || 
+                line.trim() === 'F' || line.trim() === 'I' || line.trim() === 'E' || 
+                line.trim() === 'D' || line.trim() === '.' || line.trim() === '2' || 
+                line.trim() === '0' || line.trim() === '5') {
+        return <span key={index} className="text-lg font-bold text-green-600 inline-block">{line}</span>;
+      } else if (line.trim() === 'Note: This is an optional feature. You can study at W3Schools without creating an account.') {
+        return <p key={index} className="italic text-gray-600 my-2">{line}</p>;
+      } else if (line.trim() === 'Click on the "Try it Yourself" button to see how it works.') {
+        return <p key={index} className="font-semibold my-2">{line}</p>;
+      } else if (line.trim() === 'Tutorial on YouTubeTutorial on YouTube') {
+        return (
+          <div key={index} className="flex justify-center my-2">
+            <button className="bg-red-600 text-white px-4 py-2 rounded-lg mt-2">
+              Watch on YouTube
+            </button>
+          </div>
+        );
+      } else if (line.trim() === '') {
+        return <div key={index} className="my-4"></div>;
+      } else {
+        return <p key={index} className="my-1">{line}</p>;
+      }
+    });
+  };
 
   return (
-    <>
-      {incorrectAudio}
-      {correctAudio}
-      <Header
-        hearts={hearts}
-        percentage={percentage}
-        hasActiveSubscription={!!userSubscription?.isActive}
-      />
-      <div className="flex-1">
-        <div className="h-full flex items-center justify-center">
-          <div className="lg:min-h-[350px] lg:w-[600px] w-full px-6 lg:px-0 flex flex-col gap-y-12">
-            <h1 className="text-lg lg:text-3xl text-center lg:text-start font-bold text-neutral-700">
-              {title}
-            </h1>
-            <div>
-              {challenge.type === "ASSIST" && (
-                <QuestionBubble question={challenge.question} />
-              )}
-              <Challenge
-                options={options}
-                onSelect={onSelect}
-                status={status}
-                selectedOption={selectedOption}
-                disabled={pending}
-                type={challenge.type}
-              />
-            </div>
-          </div>
+    <div className="flex flex-col min-h-screen">
+      <div className="flex-1 p-6 overflow-auto">
+        <div className="max-w-3xl mx-auto">
+          <div className="prose">{formatContent(questionText)}</div>
         </div>
       </div>
-      <Footer
-        disabled={pending || !selectedOption}
-        status={status}
-        onCheck={onContinue}
-      />
-    </>
+      
+      <div className="p-6 flex justify-center">
+        <button 
+          onClick={handleFinish}
+          className="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-8 rounded-xl text-lg shadow-md transition-colors"
+        >
+          Finish
+        </button>
+      </div>
+    </div>
   );
 };
