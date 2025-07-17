@@ -1,10 +1,8 @@
-import { neon } from "@neondatabase/serverless";
-import { drizzle } from "drizzle-orm/neon-http";
+// Mock drizzle configuration
+// This file is included to avoid import errors, but doesn't connect to a real database
 
-import * as schema from "./schema";
+export const db = {
+  // Empty implementation
+};
 
-const sql = neon(process.env.DATABASE_URL!);
-// @ts-ignore
-const db = drizzle(sql, { schema });
-
-export default db;
+export default db; 
